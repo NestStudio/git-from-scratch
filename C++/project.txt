@@ -1,0 +1,1 @@
+Sample file for root folder. Please delete this file once project's written.
