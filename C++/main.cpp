@@ -1,8 +1,11 @@
 #include <iostream>
+#include <string>
+#include "VCS.hpp"
+int main(int argc, char **argv)
+{   
+    VCS vcs;
 
+    vcs.run(argc, argv);
 
-int main(int argc, char const *argv[])
-{
-    std::cout << "Hello World" << std::endl;
     return 0;
 }
