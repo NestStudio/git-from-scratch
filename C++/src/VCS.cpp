@@ -1,9 +1,8 @@
-#include <filesystem>
-
-
-
 #include "VCS.hpp"
 #include "CommandLine.hpp"
+#include "Repository.hpp"
+
+#include <filesystem>
 
 
 
@@ -16,14 +15,20 @@ void VCS::run(int argc, char** argv){
     CommandLine command;
     command.Parse(argc, argv);
 
-    std::cout << command.GetCommand() << std::endl;
-    for(auto elem : command.GetArguments()){
-        std::cout << elem << std::endl;
-    }
+    path = std::filesystem::current_path().string();
 
+    // std::cout << command.GetCommand() << std::endl;
+    // for(auto elem : command.GetArguments()){
+    //     std::cout << elem << std::endl;
+    // }
+
+    if(command.GetCommand() == "init"){
+        init();
+    }
 
 }
 
-void init(){
-
+void VCS::init(){
+    Repository repo(path);
+    repo.InitRepository();
 }
