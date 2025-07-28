@@ -6,12 +6,12 @@ use std::{
 };
 
 pub fn process_git_init() -> Result<()> {
-    let mut git_dir = current_dir()?;
-    git_dir.push(".git");
+    let current_working_dir = current_dir()?;
+    let mut git_dir = current_working_dir.join(".git");
 
     if git_dir.exists() {
         // No need to proceed further
-        bail!(".git already exists");
+        bail!("Error: .git already exists");
     } else {
         // Create .git root folder
         create_dir_all(&git_dir)?;
@@ -20,6 +20,17 @@ pub fn process_git_init() -> Result<()> {
         git_dir.push("HEAD");
         let mut head = File::create(&git_dir)?;
         writeln!(head, "ref: refs/heads/master")?;
+
+        // .git/config
+        git_dir.pop();
+        git_dir.push("config");
+        let mut config = File::create(&git_dir)?;
+        let config_text = r#"[core]
+    repositoryformatversion = 0
+    filemode = true
+    bare = false
+"#;
+        write!(config, "{config_text}")?;
 
         // .git/objects/
         git_dir.pop();
@@ -39,6 +50,11 @@ pub fn process_git_init() -> Result<()> {
         git_dir.pop();
         git_dir.push("tags");
         create_dir_all(&git_dir)?;
+
+        println!(
+            "Initialized empty Git repository in {}/.git",
+            current_working_dir.display(),
+        );
     }
 
     Ok(())
