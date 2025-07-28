@@ -4,6 +4,7 @@ use clap::Parser;
 use crate::commands::{GitCli, process_git_init, process_hash_list};
 
 mod commands;
+mod utils;
 
 fn main() -> Result<()> {
     let git_cli = GitCli::parse();
