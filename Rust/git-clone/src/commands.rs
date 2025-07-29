@@ -2,9 +2,11 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
+pub mod cat_file;
 pub mod hash_list;
 pub mod init;
 
+pub use cat_file::*;
 pub use hash_list::*;
 pub use init::*;
 
@@ -19,6 +21,7 @@ pub struct GitCli {
 pub enum Subcommands {
     Init,
     HashList(HashListArgs),
+    CatFile(CatFileArgs),
 }
 
 #[derive(Args)]
@@ -26,4 +29,11 @@ pub struct HashListArgs {
     // File to hash
     #[arg(long, short)]
     file: PathBuf,
+}
+
+#[derive(Args)]
+pub struct CatFileArgs {
+    // Hash used for decompression
+    #[arg(long, short)]
+    hash: String,
 }
