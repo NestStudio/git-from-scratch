@@ -1,13 +1,12 @@
 use std::{fs::File, io::Read};
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use flate2::read::ZlibDecoder;
 
 use crate::{commands::CatFileArgs, utils::find_git_dir};
 
 pub fn process_cat_file(cat_file_args: CatFileArgs) -> Result<()> {
     let hash = cat_file_args.hash;
-    println!("Hash length: {:?}", hash.len());
     if hash.len() != 40 {
         bail!("Invalid hash passed");
     }
@@ -15,11 +14,7 @@ pub fn process_cat_file(cat_file_args: CatFileArgs) -> Result<()> {
     let folder_name = &hash[0..2];
     let file_name = &hash[2..];
 
-    let git_dir = find_git_dir();
-    if git_dir.is_none() {
-        bail!("Unable to find .git");
-    }
-    let mut git_dir = git_dir.unwrap();
+    let mut git_dir = find_git_dir().context("Unable to find .git")?;
     git_dir.push("objects");
     git_dir.push(folder_name);
     git_dir.push(file_name);
@@ -36,11 +31,11 @@ pub fn process_cat_file(cat_file_args: CatFileArgs) -> Result<()> {
     let mut decompressed_data = Vec::new();
     decoder.read_to_end(&mut decompressed_data)?;
 
-    let null_byte_position = decompressed_data.iter().position(|&byte| byte == 0);
-    if null_byte_position.is_none() {
-        bail!("Blob data corrupted.");
-    }
-    let null_byte_position = null_byte_position.unwrap();
+    let null_byte_position = decompressed_data
+        .iter()
+        .position(|&byte| byte == 0)
+        .context("Blob data is corrupted")?;
+
     let (header_bytes, data) = decompressed_data.split_at(null_byte_position + 1);
     let header = std::str::from_utf8(header_bytes)?;
 
