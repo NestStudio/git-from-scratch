@@ -10,7 +10,8 @@ pub fn process_write_tree() -> Result<()> {
         bail!("No file/folder to write tree")
     }
 
-    recurse_working_dir(current_working_dir)?;
+    let root_tree_hash = recurse_working_dir(current_working_dir)?;
+    println!("Tree written successfully at hash: {root_tree_hash}");
 
     Ok(())
 }
