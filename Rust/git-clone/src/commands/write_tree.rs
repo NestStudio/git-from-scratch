@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 
-use crate::utils::{find_git_dir, recurse_working_dir};
+use crate::utils::*;
 
 pub fn process_write_tree() -> Result<()> {
     let git_dir = find_git_dir().context("Unable to find .git")?;
@@ -10,7 +10,7 @@ pub fn process_write_tree() -> Result<()> {
         bail!("No file/folder to write tree")
     }
 
-    let root_tree_hash = recurse_working_dir(current_working_dir)?;
+    let root_tree_hash = recurse_working_dir_write(current_working_dir)?;
     println!("Tree written successfully at hash: {root_tree_hash}");
 
     Ok(())

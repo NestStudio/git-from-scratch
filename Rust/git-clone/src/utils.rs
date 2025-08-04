@@ -1,7 +1,13 @@
-use std::{env::current_dir, fs::DirEntry, io::Write, os::unix::fs::MetadataExt, path::PathBuf};
+use std::{
+    env::current_dir,
+    fs::{self, DirEntry, File},
+    io::{Read, Write},
+    os::unix::fs::MetadataExt,
+    path::PathBuf,
+};
 
 use anyhow::{Context, Result, bail};
-use flate2::{Compression, write::ZlibEncoder};
+use flate2::{Compression, read::ZlibDecoder, write::ZlibEncoder};
 use sha1::{Digest, Sha1};
 
 pub fn find_git_dir() -> Option<PathBuf> {
@@ -20,8 +26,57 @@ pub fn find_git_dir() -> Option<PathBuf> {
     None
 }
 
-pub fn recurse_working_dir(path: PathBuf) -> Result<String> {
-    let mut directory_contents = std::fs::read_dir(&path)?
+pub fn recurse_working_dir_read(hash: &str, path: &PathBuf) -> Result<()> {
+    let (decompressed_data, null_byte_position) = read_payload_from_hash(&hash)?;
+    let (_header_bytes, data) = decompressed_data.split_at(null_byte_position + 1);
+
+    let mut checkpoint = 0usize;
+    let mut position = 0usize;
+    while position < data.len() {
+        if data[position] == 0 {
+            let tree_entry_header = std::str::from_utf8(&data[checkpoint..=position])?
+                .trim_end_matches('\0')
+                .split_ascii_whitespace()
+                .collect::<Vec<&str>>();
+            if tree_entry_header.len() != 2 {
+                bail!("Invalid Tree entry header");
+            }
+
+            let (mode, content_name) = (tree_entry_header[0], tree_entry_header[1]);
+            let content_path = path.join(content_name);
+
+            let tree_entry_hash = hex::encode(&data[position + 1..position + 21]);
+
+            match mode {
+                "40000" => {
+                    if content_path.exists() {
+                        fs::remove_dir_all(&content_path)?;
+                    }
+                    fs::create_dir_all(&content_path)?;
+                    recurse_working_dir_read(&tree_entry_hash, &content_path)?
+                }
+                "100644" | "100755" => {
+                    let (decompressed_data, null_byte_position) =
+                        read_payload_from_hash(&tree_entry_hash)?;
+                    let (_, data) = decompressed_data.split_at(null_byte_position + 1);
+                    let mut file = File::create(&content_path)?;
+                    file.write_all(data)?;
+                }
+                _ => bail!("Invalid mode detected. Tree entry corrupted"),
+            }
+
+            position += 21; // Raw hash bytes is 20 in length + next byte after null byte (/0)
+            checkpoint = position;
+            continue;
+        }
+
+        position += 1;
+    }
+    Ok(())
+}
+
+pub fn recurse_working_dir_write(path: PathBuf) -> Result<String> {
+    let mut directory_contents = fs::read_dir(&path)?
         .filter_map(Result::ok)
         .collect::<Vec<DirEntry>>();
     directory_contents.sort_by_key(|content| content.file_name());
@@ -37,7 +92,7 @@ pub fn recurse_working_dir(path: PathBuf) -> Result<String> {
         }
 
         if content_path.is_dir() {
-            let subtree_hash = recurse_working_dir(content_path)?;
+            let subtree_hash = recurse_working_dir_write(content_path)?;
             tree_bytes.append(&mut build_tree_entry(&content, &subtree_hash)?);
         } else {
             let (payload, hash) = hash_blob(&content_path)?;
@@ -55,7 +110,7 @@ pub fn recurse_working_dir(path: PathBuf) -> Result<String> {
 }
 
 pub fn hash_blob(file_path: &PathBuf) -> Result<(Vec<u8>, String)> {
-    let data = std::fs::read(file_path)?;
+    let data = fs::read(file_path)?;
     let header = format!("blob {}\0", data.len());
     let payload_to_hash = [header.as_bytes(), &data].concat();
     let hash = hex::encode(Sha1::digest(&payload_to_hash));
@@ -79,7 +134,7 @@ pub fn create_object_dir(git_dir: &mut PathBuf, hash: &str) -> Result<()> {
     let object_dir_name = &hash[0..2];
     git_dir.push("objects");
     git_dir.push(object_dir_name);
-    std::fs::create_dir_all(&git_dir)?;
+    fs::create_dir_all(&git_dir)?;
 
     Ok(())
 }
@@ -93,10 +148,26 @@ pub fn write_payload(git_dir: &mut PathBuf, hash: &str, payload: &[u8]) -> Resul
     let file_name = &hash[2..];
     git_dir.push(file_name);
     let compressed_data = compress_data(payload)?;
-    let mut file = std::fs::File::create(&git_dir)?;
+    let mut file = fs::File::create(&git_dir)?;
     file.write_all(&compressed_data)?;
 
     Ok(())
+}
+
+pub fn read_payload_from_hash(hash: &str) -> Result<(Vec<u8>, usize)> {
+    if hash.len() != 40 {
+        bail!("Invalid hash passed");
+    }
+
+    let buffer = find_file_git_objects(&hash)?;
+    let decompressed_data = decompress_buffer(&buffer)?;
+
+    let null_byte_position = decompressed_data
+        .iter()
+        .position(|&byte| byte == 0)
+        .context("Data is corrupted")?;
+
+    Ok((decompressed_data, null_byte_position))
 }
 
 pub fn build_tree_entry(content: &DirEntry, hash: &str) -> Result<Vec<u8>> {
@@ -116,7 +187,7 @@ pub fn build_tree_entry(content: &DirEntry, hash: &str) -> Result<Vec<u8>> {
 }
 
 pub fn parse_git_mode(path: &PathBuf) -> Result<String> {
-    let metadata = std::fs::metadata(path)?;
+    let metadata = fs::metadata(path)?;
     let mode = metadata.mode();
     let file_type = metadata.file_type();
 
@@ -131,4 +202,32 @@ pub fn parse_git_mode(path: &PathBuf) -> Result<String> {
     } else {
         bail!("Invalid file type")
     })
+}
+
+pub fn find_file_git_objects(hash: &str) -> Result<Vec<u8>> {
+    let mut git_dir = find_git_dir().context("Unable to find .git")?;
+    let folder_name = &hash[0..2];
+    let file_name = &hash[2..];
+
+    git_dir.push("objects");
+    git_dir.push(folder_name);
+    git_dir.push(file_name);
+
+    if !git_dir.exists() {
+        bail!("Object not found");
+    }
+
+    let mut file = fs::File::open(&git_dir)?;
+    let mut buffer = vec![];
+    file.read_to_end(&mut buffer)?;
+
+    Ok(buffer)
+}
+
+pub fn decompress_buffer(buffer: &[u8]) -> Result<Vec<u8>> {
+    let mut decoder = ZlibDecoder::new(buffer);
+    let mut decompressed_data = Vec::new();
+    decoder.read_to_end(&mut decompressed_data)?;
+
+    Ok(decompressed_data)
 }
