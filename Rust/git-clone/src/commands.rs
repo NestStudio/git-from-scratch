@@ -23,10 +23,15 @@ pub struct GitCli {
 
 #[derive(Subcommand)]
 pub enum Subcommands {
+    /// Create a new git repository
     Init,
+    /// Create a new blob
     HashList(HashListArgs),
+    /// Read a blob hash and retrieve contents
     CatFile(CatFileArgs),
+    /// Build a blob tree
     WriteTree,
+    /// Read a blob tree hash and retrieve subtrees/contents
     ReadTree(ReadTreeArgs),
 }
 
