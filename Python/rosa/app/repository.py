@@ -141,3 +141,32 @@ def default_config() -> configparser.ConfigParser:
     config.set("core", "bare", "false")
 
     return config
+
+
+def find_repository(path: str | Path = ".",
+                    required: bool = True) -> Optional[GitRepository]:
+    """Find a Git repository by walking up the directory tree
+
+    Args:
+        path: Starting path
+        required: Raise exception if repository not found
+
+    Returns:
+        GitRepository if found, None if not found and not required
+    """
+    path = Path(path).resolve()
+
+    if (path / ".git").is_dir():
+        return GitRepository(path)
+
+    parent = path.parent
+
+    if parent == path:
+        # We have reached the root
+        if required:
+            raise RuntimeError("No git directory")
+        else:
+            return None
+
+    # Recursive case
+    return find_repository(parent, required)
