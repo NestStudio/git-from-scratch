@@ -7,7 +7,9 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use chrono::Utc;
 use flate2::{Compression, read::ZlibDecoder, write::ZlibEncoder};
+use regex::Regex;
 use sha1::{Digest, Sha1};
 
 pub fn find_git_dir() -> Option<PathBuf> {
@@ -230,4 +232,27 @@ pub fn decompress_buffer(buffer: &[u8]) -> Result<Vec<u8>> {
     decoder.read_to_end(&mut decompressed_data)?;
 
     Ok(decompressed_data)
+}
+
+pub fn is_valid_name(name: &str) -> bool {
+    let re = Regex::new(r"^[A-Za-z]+(?: [A-Za-z]+)*$").unwrap();
+    re.is_match(name) && name.len() >= 2 && name.len() <= 50
+}
+
+pub fn get_utc_timestamp() -> String {
+    let now = Utc::now();
+    format!("{} +0000", now.timestamp())
+}
+
+pub fn build_commit_payload(hash: &str, name: &str, email: &str, message: &str) -> String {
+    let author = format!("{} <{}>", name, email);
+    let timestamp = get_utc_timestamp();
+    format!(
+        "tree {}\n\
+        author {} {}\n\
+        committer {} {}\n\
+        \n\
+        {}\n",
+        hash, &author, &timestamp, &author, &timestamp, &message,
+    )
 }

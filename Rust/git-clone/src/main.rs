@@ -15,6 +15,7 @@ fn main() -> Result<()> {
         commands::Subcommands::CatFile(cat_file_args) => process_cat_file(cat_file_args)?,
         commands::Subcommands::WriteTree => process_write_tree()?,
         commands::Subcommands::ReadTree(read_tree_args) => process_read_tree(read_tree_args)?,
+        commands::Subcommands::Commit(commit_args) => process_commit(commit_args)?,
     };
 
     Ok(())
