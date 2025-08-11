@@ -1,0 +1,18 @@
+[package]
+name = "git-clone"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "sgit"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.98"
+chrono = "0.4.41"
+clap = { version = "4.5.41", features = ["derive"] }
+flate2 = "1.1.2"
+hex = "0.4.3"
+regex = "1.11.1"
+sha1 = "0.10.6"
+validator = "0.20.0"
