@@ -184,7 +184,7 @@ def index_write(repo: GitRepository, index: GitIndex) -> None:
         # write magic bytes
         f.write(b"DIRC")
         # write vesion number
-        f.write(index.version.to_byes(4, "big"))
+        f.write(index.version.to_bytes(4, "big"))
         # write number from entries
         f.write(len(index.entries).to_bytes(4, "big"))
 
@@ -199,8 +199,9 @@ def index_write(repo: GitRepository, index: GitIndex) -> None:
             f.write(e.ino.to_bytes(4, "big"))
 
             # Mode
+            f.write((0).to_bytes(2, "big"))
             mode = (e.mode_type << 12) | e.mode_perms
-            f.write(mode.to_bytes(4, "big"))
+            f.write(mode.to_bytes(2, "big"))
 
             f.write(e.uid.to_bytes(4, "big"))
             f.write(e.gid.to_bytes(4, "big"))
@@ -214,9 +215,8 @@ def index_write(repo: GitRepository, index: GitIndex) -> None:
 
             name_bytes = e.name.encode("utf8")
             bytes_len = len(name_bytes)
-            name_length = min(bytes_len, 0xFFF)  # Max 4095
+            name_length = min(bytes_len, 0xFFF)
 
-            # Merge flags and name length
             f.write((flag_assume_valid | e.flag_stage | name_length).to_bytes(2, "big"))
 
             # Write name and null terminator

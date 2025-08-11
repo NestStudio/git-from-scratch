@@ -26,7 +26,7 @@ class GitRepository:
         self.conf = configparser.ConfigParser()
         config_file = self.file_path("config")
 
-        if config_file and config_file.exist():
+        if config_file and config_file.exists():
             self.conf.read([str(config_file)])
         elif not force:
             raise RuntimeError("Configuration file missing")
@@ -45,7 +45,7 @@ class GitRepository:
 
     def path(self, *path_parts: str) -> Path:
         """Compute path under repo's gitdir"""
-        return self. gitdir.joinpath(*path_parts)
+        return self.gitdir.joinpath(*path_parts)
 
     def file_path(self, *path_parts: str,
                   mkdir: bool = False) -> Optional[Path]:

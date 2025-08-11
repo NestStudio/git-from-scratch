@@ -93,7 +93,7 @@ def tree_parse_one(raw: bytes, start: int = 0) -> tuple[int, GitTreeLeaf]:
     assert x - start in (5, 6)
 
     # Read mode
-    mode = x[start:x]
+    mode = raw[start:x]
     if len(mode) == 5:
         # Normalize to six bytes
         mode = b"0" + mode
@@ -233,10 +233,17 @@ def kvlm_serialize(kvlm: Dict[Optional[bytes], Any]) -> bytes:
             val = [val]
 
         for v in val:
+            if isinstance(v, str):
+                v = v.encode("utf8")
             ret += k + b" " + v.replace(b"\b", b"\n ") + b"\n"
 
         # Append message
-        ret += b"\n" + kvlm[None]
+        if None in kvlm:
+            message = kvlm[None]
+            if isinstance(message, str):
+                message = message.encode("utf8")
+            ret += b"\n" + message
+
         return ret
 
 
@@ -265,6 +272,12 @@ def object_read(repo: GitRepository, sha: str) -> Optional[GitObject]:
         match fmt:
             case b"commit":
                 cls = GitCommit
+            case b"tree":
+                cls = GitTree
+            case b"blob":
+                cls = GitBlob
+            case b"tag":
+                cls = GitTag
             case _:
                 raise RuntimeError(
                     f"Unknown type {fmt.decode('ascii')} for object {sha}"
@@ -278,7 +291,7 @@ def object_write(obj: GitObject, repo: Optional[GitRepository] = None) -> str:
     # Serialize object data
     data = obj.serialize()
     # Add header
-    result = obj.fmt + b" " + str(len(data)) + b"\x00" + data
+    result = obj.fmt + b" " + str(len(data)).encode() + b"\x00" + data
     # compute hash
     sha = hashlib.sha1(result).hexdigest()
 
@@ -294,16 +307,21 @@ def object_write(obj: GitObject, repo: Optional[GitRepository] = None) -> str:
     return sha
 
 
-def object_hash(
-        fd: TextIO, fmt: bytes, repo: Optional[GitRepository] = None
-        ) -> str:
+def object_hash(fd, fmt: bytes, repo=None) -> str:
     """Hash object, writing it to repo if provided"""
-    data = fd.read().encode() if hasattr(fd.read(), 'encode') else fd.read()
+    # Read the data properly
+    data = fd.read()
 
     # Choose constructor according to fmt argument
     match fmt:
         case b"commit":
             obj = GitCommit(data)
+        case b"tree":
+            obj = GitTree(data)
+        case b"blob":
+            obj = GitBlob(data)
+        case b"tag":
+            obj = GitTag(data)
         case _:
             raise RuntimeError(f"Unknown type {fmt}!")
 
