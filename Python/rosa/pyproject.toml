@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "mygit"
+version = "0.1.0"
+description = "A Git implementation in Python for learning purposes"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+black = "^23.0"
+ruff = "^0.1.0"
+mypy = "^1.0"
+
+[tool.poetry.scripts]
+mygit = "app.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = ["E", "W", "F", "I", "N", "UP", "ANN", "S", "B", "A", "COM", "C4", "DTZ", "T10", "EM", "EXE", "ISC", "ICN", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID", "TCH", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "RUF"]
+ignore = ["ANN101", "ANN102", "S101", "PLR0913", "PLR0912", "PLR0915", "C901"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
